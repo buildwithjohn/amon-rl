@@ -25,3 +25,19 @@ oscillation on seed 3 (295 -> 483.5).
 ## Reproduce
     pip install torch gymnasium numpy matplotlib
     python src/ppo.py --env CartPole-v1 --steps 300000 --seed 1 --log results/run.csv
+
+## Gate 2 log (in progress)
+LunarLander-v2 was renamed LunarLander-v3 in Gymnasium 1.x; v3 used throughout.
+- Run 1 (CartPole defaults, batch 512): peaked +40 @ 700k, regressed to -17 @ 1M.
+- Run 2 (batch 4096, mb 2048): converged to worse myopic policy (-53).
+- Run 3 (SB3-Zoo gamma=0.999, lambda=0.98 but mb 2048): -93. Root cause of
+  runs 2-3: scaling batch without scaling optimiser steps (16 grad steps/update
+  vs run 1's dense updates).
+- Run 4 (faithful Zoo config: 8x1024 rollout, minibatch 64, gamma .999,
+  lambda .98): learns cleanly, 116.7 @ 1M.
+- Run 5 (same, 2M steps): plateau 118.6. Distribution over last 400k: 78% of
+  episodes in [100,200), 1% >=200, 2% crashes -- consistent safe-but-inefficient
+  landings, a stable local optimum rather than instability.
+- Verification vs reference in progress: CleanRL master targets gymnasium <1.0
+  (reads infos["final_info"]), so the reference runs in a venv with
+  gymnasium 0.29.1 on LunarLander-v2, matched budget and hyperparameters.

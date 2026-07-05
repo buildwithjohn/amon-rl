@@ -240,8 +240,18 @@ if __name__ == "__main__":
     ap.add_argument("--steps", type=int, default=150_000)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--log", default=None)
+    ap.add_argument("--num-envs", type=int, default=4)
+    ap.add_argument("--num-steps", type=int, default=128)
+    ap.add_argument("--ent-coef", type=float, default=0.01)
+    ap.add_argument("--gamma", type=float, default=0.99)
+    ap.add_argument("--gae-lambda", type=float, default=0.95)
+    ap.add_argument("--num-minibatches", type=int, default=4)
     args = ap.parse_args()
     history, agent = train(env_id=args.env, total_timesteps=args.steps,
-                           seed=args.seed, log_path=args.log)
+                           seed=args.seed, log_path=args.log,
+                           num_envs=args.num_envs, num_steps=args.num_steps,
+                           ent_coef=args.ent_coef, gamma=args.gamma,
+                           gae_lambda=args.gae_lambda,
+                           num_minibatches=args.num_minibatches)
     tail = [r for _, r in history[-100:]]
     print(f"\nFinal avg return over last 100 episodes: {np.mean(tail):.1f}")

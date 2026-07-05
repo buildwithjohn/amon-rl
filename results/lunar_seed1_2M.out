@@ -1,0 +1,15 @@
+update   20/244 | step  163840 | avg return (last 20 eps):    49.0 | 2315 steps/s
+update   40/244 | step  327680 | avg return (last 20 eps):   112.9 | 2272 steps/s
+update   60/244 | step  491520 | avg return (last 20 eps):   125.0 | 2287 steps/s
+update   80/244 | step  655360 | avg return (last 20 eps):   103.3 | 2286 steps/s
+update  100/244 | step  819200 | avg return (last 20 eps):   112.7 | 2280 steps/s
+update  120/244 | step  983040 | avg return (last 20 eps):   109.2 | 2277 steps/s
+update  140/244 | step 1146880 | avg return (last 20 eps):   101.9 | 2280 steps/s
+update  160/244 | step 1310720 | avg return (last 20 eps):   119.9 | 2281 steps/s
+update  180/244 | step 1474560 | avg return (last 20 eps):   105.4 | 2279 steps/s
+update  200/244 | step 1638400 | avg return (last 20 eps):   110.8 | 2282 steps/s
+update  220/244 | step 1802240 | avg return (last 20 eps):   127.9 | 2284 steps/s
+update  240/244 | step 1966080 | avg return (last 20 eps):   110.6 | 2282 steps/s
+update  244/244 | step 1998848 | avg return (last 20 eps):   136.6 | 2282 steps/s
+
+Final avg return over last 100 episodes: 118.6

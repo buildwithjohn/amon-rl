@@ -1,0 +1,9 @@
+update   20/122 | step  163840 | avg return (last 20 eps):  -122.9 | 4618 steps/s
+update   40/122 | step  327680 | avg return (last 20 eps):  -129.4 | 4645 steps/s
+update   60/122 | step  491520 | avg return (last 20 eps):   -93.1 | 4668 steps/s
+update   80/122 | step  655360 | avg return (last 20 eps):   -81.4 | 4672 steps/s
+update  100/122 | step  819200 | avg return (last 20 eps):   -99.4 | 4662 steps/s
+update  120/122 | step  983040 | avg return (last 20 eps):   -91.3 | 4666 steps/s
+update  122/122 | step  999424 | avg return (last 20 eps):   -85.1 | 4661 steps/s
+
+Final avg return over last 100 episodes: -93.0
