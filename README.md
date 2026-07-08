@@ -130,3 +130,34 @@ limitation the proposal critiques, now visible in the numbers.
   masking, NDPR enforcement against violating actions, seed determinism,
   the concentration-overloads/distribution-relieves calibration property,
   and reward non-degeneracy).
+
+
+## Training status (partial, Chapter 4/5 material)
+The GAT-encoded PPO agent (src/amon_agent.py) trains against the AMON
+environment via src/train_amon.py. A 300k-step run was launched in the dev
+sandbox but reclaimed at 82k steps (background processes are not persistent
+there). The captured trajectory (results/amon_gat_seed1_partial.csv):
+
+  step    greedy  sampled  SLA  p99  ndpr_viol
+  2048     91.4    116.6  1.00   23    0
+  20480    91.8    126.0  1.00   22    0
+  40960    91.8    130.4  1.00   21    0
+  61440    92.1    133.1  1.00   23    0
+  81920    92.3    133.5  1.00   24    0
+
+Reading: the agent learns to spread load (sampled return 116 -> 133, SLA
+locked at 1.00, p99 low) and never violates NDPR (0 throughout, by
+construction via action masking). At 82k steps sampled return ~133 sits at
+round-robin level (138), below greedy best-fit (177) and HPA (166). The
+greedy-vs-sampled gap (92 vs 133) shows the policy is still highly
+stochastic -- it has not sharpened into a confident deterministic strategy.
+
+Whether longer training + reward engineering lifts it above the capacity-
+aware heuristics is the open Tier-1/Tier-2 question. Full-budget multi-seed
+runs are to be executed locally (see RUNNING_LOCALLY.md) since they need to
+run to completion uninterrupted.
+
+## Running training yourself
+See RUNNING_LOCALLY.md for a step-by-step guide. Short version, from src/:
+    python run_sweep.py --seeds 3 --steps 300000 --encoders gat
+    # add 'flat' to --encoders for the RQ4 ablation

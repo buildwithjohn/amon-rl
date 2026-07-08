@@ -1,0 +1,18 @@
+# AMON-RL thesis — Python dependencies
+# Author: John Ayomide Akinola (ESCT/MSC/24/IT/0002/26)
+#
+# Versions pinned to what the gate and environment work was verified on.
+# CPU-only torch is fine for this project (the graphs are tiny); if you have
+# an NVIDIA GPU you may install the CUDA build of torch instead, but it is
+# not required and gives little benefit at N=10 services.
+
+torch>=2.2,<3
+gymnasium>=1.0,<2
+torch_geometric>=2.5,<3
+numpy>=1.26
+matplotlib>=3.7
+
+# For the Gate-2 CleanRL reference comparison only (optional, separate venv):
+#   gymnasium[box2d]<1.0
+#   tyro
+#   tensorboard

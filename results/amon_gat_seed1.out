@@ -1,1 +1,5 @@
 upd    1/146 | step    2048 | greedyR    91.4 | sampR   116.6 | SLA 1.00 | $ 1.11 | p99    23ms | viol 0 | 90 st/s
+upd   10/146 | step   20480 | greedyR    91.8 | sampR   126.0 | SLA 1.00 | $ 1.14 | p99    22ms | viol 0 | 114 st/s
+upd   20/146 | step   40960 | greedyR    91.8 | sampR   130.4 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 115 st/s
+upd   30/146 | step   61440 | greedyR    92.1 | sampR   133.1 | SLA 1.00 | $ 1.11 | p99    23ms | viol 0 | 117 st/s
+upd   40/146 | step   81920 | greedyR    92.3 | sampR   133.5 | SLA 1.00 | $ 1.11 | p99    24ms | viol 0 | 117 st/s
