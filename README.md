@@ -91,3 +91,42 @@ trains and learns in both feature regimes; the part-2 criterion
 mis-design is recorded as an instructive negative result for Chapter 4.
 
 - [x] Gate 3 — GAT layer vs PyTorch Geometric GATConv: PASSED (exact, 0.00e+00)
+
+
+## Environment build log (Chapter 4 material)
+The AMON simulation environment (src/amon_env.py) implements the proposal's
+MDP (Section 6.2): MultiDiscrete placement action over 3 clouds per service,
+the reward R = alpha*SLA - beta*Cost - delta*Latency + eta*Util, and the
+latency model L_ij = L_prop + L_queue_i + L_proc_j.
+
+Supporting modules:
+- src/clouds.py    — 3-provider model. Inter-cloud propagation latency,
+  compute price, egress price, capacity. Calibrated against published
+  figures (Kentik Cloud Latency Map Oct-2024 cross-provider RTTs; public
+  on-demand and egress pricing). Provenance and assumptions documented
+  inline for Chapter 4.
+- src/topology.py  — Online Boutique service graph (10 services, 12
+  dependencies), per-service vCPU/payload/processing demands, NDPR flags.
+- src/baselines.py — the four comparators for Tier-1 evaluation.
+
+### Calibration forensics (recorded as it happened)
+First build was trivially solvable: capacity (40-48 vCPU/cloud) dwarfed
+demand (~20 vCPU), so utilisation never rose, the queue term never fired,
+and every policy hit SLA 1.00 at ~20ms p99 against a 120ms target. Probing
+four fixed policies BEFORE training exposed this (all scored similarly;
+placement did not matter). Fix: recalibrated capacity to 22-26 vCPU/cloud
+so that concentrating all load on one cloud overloads it at peak
+(single-cloud peak util ~1.8, p99 ~125ms, SLA 0.80) while distributing
+stays feasible (total capacity ~74 vs peak demand ~46). SLA target lowered
+to 80ms so latency actually binds. Post-fix baseline ordering is sensible
+and separated:
+  greedy_bestfit 177 > hpa_emulation 166 > round_robin 138 > random 118
+(all NDPR-compliant). Greedy leads by capacity-planning; HPA lags because
+it reacts only after utilisation is already high -- the reactive-latency
+limitation the proposal critiques, now visible in the numbers.
+
+### Tests
+- src/test_amon_env.py: 8/8 pass (spaces, Gymnasium API, truncation, NDPR
+  masking, NDPR enforcement against violating actions, seed determinism,
+  the concentration-overloads/distribution-relieves calibration property,
+  and reward non-degeneracy).
