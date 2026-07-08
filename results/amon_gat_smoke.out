@@ -1,0 +1,3 @@
+upd    1/58 | step    2048 | eval R    91.4 | SLA 1.00 | $ 1.11 | p99    23ms | ndpr_viol 0 | 109 st/s
+upd   10/58 | step   20480 | eval R    91.2 | SLA 1.00 | $ 1.11 | p99    23ms | ndpr_viol 0 | 99 st/s
+upd   20/58 | step   40960 | eval R    90.9 | SLA 1.00 | $ 1.11 | p99    25ms | ndpr_viol 0 | 108 st/s
