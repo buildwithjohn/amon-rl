@@ -246,3 +246,47 @@ sharpened. --ent-coef-final anneals it linearly to near-zero over training.
     python amon_env_v2.py                    # v2 baselines
     python run_sweep.py --env v2 --seeds 3 --steps 300000 \
         --encoders gat --ent-coef 0.02 --ent-coef-final 0.001
+
+## v2 result (3 seeds x 300k) and why it was NOT a converged result
+
+    agent: greedy 90.3 +/- 23.4 | sampled 67.6 +/- 27.0
+    v2 baselines: hpa 164.1 | greedy 148.3 | round_robin 142.7 | best static 178.1
+
+Below every non-random baseline. But the run was STOPPED, not finished. Every
+seed was still climbing at the final update:
+
+    seed 2 sampled tail: 85.9 -> 90.7 -> 100.4 -> 106.7 -> 110.7 -> 111.1
+    seed 1 sampled tail: 17.7 -> 19.1 ->  26.1 ->  32.6 ->  38.4 ->  45.8
+
+and the +/-23 seed spread is the signature of policies still descending into
+different local optima, not of convergence. Two genuine positives:
+
+1. ENTROPY ANNEALING (Fix A) WORKED. The greedy/sampled gap closed for the
+   first time (seed 2: greedy 124 vs sampled 111; on v1 the gap never moved
+   off 45 points). The policy commits instead of flailing.
+2. THE AGENT LEARNED MIGRATION DISCIPLINE UNAIDED. It starts churning (164
+   migrations) and learns down to 12-17, better than greedy best-fit's 125.
+   It discovered "do not thrash" from the reward alone.
+
+What it has not learned is to PACK well: SLA stays 1.00 and p99 stays low, so
+it is not overloading -- it is sitting on a stable but mediocre placement.
+
+### The two limiters, and the fix (src/train_amon_vec.py)
+1. NOISY GRADIENTS. train_amon.py rolls a SINGLE env: at rollout 2048 with
+   200-step episodes that is ~10 episodes per gradient update for a 10-headed
+   action space. Vectorising to 8 parallel envs gives 8x the trajectory
+   diversity per update.
+2. TOO SLOW TO TRAIN LONG. The GAT forward looped over the batch in Python.
+   Batching the B graphs into ONE disjoint graph (node indices offset by b*N;
+   no edges between sub-graphs, so no leakage) makes it a single forward.
+   Verified numerically identical to the loop: max difference 0.00e+00
+   (src/test_batched_gat.py).
+
+    throughput: 66 st/s -> 615 st/s  (9x). A 1M-step run is now ~30 min.
+
+This makes the under-training hypothesis testable rather than merely asserted.
+
+### Run the long test
+    cd src
+    python run_sweep.py --env v2 --vec --seeds 3 --steps 1000000 \
+        --encoders gat --lr 1e-3 --ent-coef 0.02 --ent-coef-final 0.001

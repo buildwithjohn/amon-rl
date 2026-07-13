@@ -25,6 +25,7 @@ import argparse
 import numpy as np
 
 from train_amon import train, evaluate, evaluate_sampled
+from train_amon_vec import train_vec
 
 
 def main():
@@ -44,6 +45,10 @@ def main():
     ap.add_argument("--env", default="v1", choices=["v1", "v2"],
                     help="v1=myopic (greedy near-optimal); "
                          "v2=sequential with migration cost")
+    ap.add_argument("--vec", action="store_true",
+                    help="use vectorised rollouts (8 parallel envs, ~9x faster "
+                         "and far less gradient noise). Recommended.")
+    ap.add_argument("--num-envs", type=int, default=8)
     ap.add_argument("--outdir", default="../results")
     args = ap.parse_args()
 
@@ -57,11 +62,18 @@ def main():
             log = os.path.join(args.outdir, f"amon_{tag}.csv")
             print(f"\n{'='*60}\nRUN: encoder={encoder} seed={seed} "
                   f"steps={args.steps}\n{'='*60}")
-            hist, agent = train(
-                encoder=encoder, total_steps=args.steps, seed=seed,
-                lr=args.lr, ent_coef=args.ent_coef,
-                ent_coef_final=args.ent_coef_final,
-                env_version=args.env, log_path=log)
+            if args.vec:
+                hist, agent = train_vec(
+                    encoder=encoder, env_version=args.env,
+                    total_steps=args.steps, num_envs=args.num_envs,
+                    seed=seed, lr=args.lr, ent_coef=args.ent_coef,
+                    ent_coef_final=args.ent_coef_final, log_path=log)
+            else:
+                hist, agent = train(
+                    encoder=encoder, total_steps=args.steps, seed=seed,
+                    lr=args.lr, ent_coef=args.ent_coef,
+                    ent_coef_final=args.ent_coef_final,
+                    env_version=args.env, log_path=log)
 
             # Final evaluation: 20 episodes, both greedy and sampled.
             gr, sla, cost, p99, viol, mig = evaluate(
