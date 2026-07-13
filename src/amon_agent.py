@@ -68,19 +68,41 @@ class GraphStateEncoder(nn.Module):
         self.register_buffer("edge_index", _EDGE_INDEX)
         scale = _NODE_SCALE_V2 if node_feat == 13 else _NODE_SCALE
         self.register_buffer("node_scale", scale)
+        self._ei_cache = {}
+
+    def _batched_edge_index(self, B, device):
+        """Replicate the fixed topology B times as one disjoint graph, with
+        node indices offset by b*N. Cached per (B, device)."""
+        key = (B, str(device))
+        cached = self._ei_cache.get(key)
+        if cached is not None:
+            return cached
+        ei = self.edge_index.to(device)                    # (2, E)
+        E = ei.shape[1]
+        offs = (torch.arange(B, device=device) * self.N).view(B, 1, 1)
+        big = (ei.unsqueeze(0) + offs).permute(1, 0, 2).reshape(2, B * E)
+        self._ei_cache[key] = big
+        return big
 
     def forward(self, obs):
-        """obs: (B, obs_dim) -> node_emb (B, N, D), global (B, glob_feat)."""
+        """obs: (B, obs_dim) -> node_emb (B, N, D), global (B, glob_feat).
+
+        The service topology is identical for every sample, so instead of
+        looping the GAT over the batch we stack the B graphs into ONE disjoint
+        graph (node indices offset by b*N) and do a single GAT forward. There
+        are no edges between sub-graphs, so message passing cannot leak across
+        samples: the result is mathematically identical to the loop, but ~B
+        times faster. Verified against the loop implementation in
+        test_batched_gat.py.
+        """
         B = obs.shape[0]
         Nf = self.N * self.node_feat
         nodes = obs[:, :Nf].view(B, self.N, self.node_feat) / self.node_scale
         glob = obs[:, Nf:]
-        # GAT is defined per-graph; loop is fine at N=10, B<=few thousand it
-        # is still cheap, but we batch by stacking into one big disjoint graph.
-        embs = []
-        for b in range(B):
-            embs.append(self.gat(nodes[b], self.edge_index))
-        node_emb = torch.stack(embs, dim=0)          # (B, N, D)
+        flat = nodes.reshape(B * self.N, self.node_feat)
+        big_ei = self._batched_edge_index(B, obs.device)
+        out = self.gat(flat, big_ei)                       # (B*N, D)
+        node_emb = out.view(B, self.N, -1)                 # (B, N, D)
         return node_emb, glob
 
 
