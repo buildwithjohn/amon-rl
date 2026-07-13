@@ -1,0 +1,71 @@
+
+============================================================
+RUN: encoder=gat seed=1 steps=300000
+============================================================
+upd    1/146 | step    2048 | greedyR    91.4 | sampR   116.6 | SLA 1.00 | $ 1.11 | p99    23ms | viol 0 | 300 st/s
+upd   10/146 | step   20480 | greedyR    91.6 | sampR   126.0 | SLA 1.00 | $ 1.14 | p99    22ms | viol 0 | 413 st/s
+upd   20/146 | step   40960 | greedyR    91.3 | sampR   130.1 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 421 st/s
+upd   30/146 | step   61440 | greedyR    92.3 | sampR   132.2 | SLA 1.00 | $ 1.11 | p99    24ms | viol 0 | 416 st/s
+upd   40/146 | step   81920 | greedyR    92.1 | sampR   128.8 | SLA 1.00 | $ 1.11 | p99    24ms | viol 0 | 412 st/s
+upd   50/146 | step  102400 | greedyR    91.3 | sampR   128.3 | SLA 1.00 | $ 1.14 | p99    22ms | viol 0 | 412 st/s
+upd   60/146 | step  122880 | greedyR    87.8 | sampR   131.7 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 415 st/s
+upd   70/146 | step  143360 | greedyR    79.6 | sampR   124.3 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 418 st/s
+upd   80/146 | step  163840 | greedyR    89.4 | sampR   132.2 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 421 st/s
+upd   90/146 | step  184320 | greedyR    92.1 | sampR   132.0 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 423 st/s
+upd  100/146 | step  204800 | greedyR    91.4 | sampR   135.7 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 425 st/s
+upd  110/146 | step  225280 | greedyR    91.3 | sampR   135.1 | SLA 1.00 | $ 1.14 | p99    22ms | viol 0 | 427 st/s
+upd  120/146 | step  245760 | greedyR    92.4 | sampR   133.7 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 428 st/s
+upd  130/146 | step  266240 | greedyR    92.4 | sampR   131.0 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 429 st/s
+upd  140/146 | step  286720 | greedyR    92.6 | sampR   133.0 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 430 st/s
+upd  146/146 | step  299008 | greedyR    92.6 | sampR   131.8 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 430 st/s
+FINAL gat_seed1: greedy 87.9 | sampled 131.4 | SLA 1.00 | $1.03 | p99 20ms | viol 0
+
+============================================================
+RUN: encoder=gat seed=2 steps=300000
+============================================================
+upd    1/146 | step    2048 | greedyR    93.0 | sampR   120.4 | SLA 1.00 | $ 1.15 | p99    22ms | viol 0 | 309 st/s
+upd   10/146 | step   20480 | greedyR    92.3 | sampR   128.9 | SLA 1.00 | $ 1.11 | p99    24ms | viol 0 | 414 st/s
+upd   20/146 | step   40960 | greedyR    91.4 | sampR   129.7 | SLA 1.00 | $ 1.11 | p99    24ms | viol 0 | 404 st/s
+upd   30/146 | step   61440 | greedyR    91.5 | sampR   134.6 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 413 st/s
+upd   40/146 | step   81920 | greedyR    90.8 | sampR   133.0 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 416 st/s
+upd   50/146 | step  102400 | greedyR    91.7 | sampR   134.8 | SLA 1.00 | $ 1.14 | p99    22ms | viol 0 | 418 st/s
+upd   60/146 | step  122880 | greedyR    91.0 | sampR   134.5 | SLA 1.00 | $ 1.11 | p99    24ms | viol 0 | 421 st/s
+upd   70/146 | step  143360 | greedyR    92.6 | sampR   129.5 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 424 st/s
+upd   80/146 | step  163840 | greedyR    91.9 | sampR   133.2 | SLA 1.00 | $ 1.13 | p99    21ms | viol 0 | 427 st/s
+upd   90/146 | step  184320 | greedyR    91.8 | sampR   135.3 | SLA 1.00 | $ 1.14 | p99    25ms | viol 0 | 428 st/s
+upd  100/146 | step  204800 | greedyR    89.8 | sampR   131.5 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 426 st/s
+upd  110/146 | step  225280 | greedyR    91.0 | sampR   133.1 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 427 st/s
+upd  120/146 | step  245760 | greedyR    92.3 | sampR   127.1 | SLA 1.00 | $ 1.15 | p99    21ms | viol 0 | 429 st/s
+upd  130/146 | step  266240 | greedyR    91.8 | sampR   136.5 | SLA 1.00 | $ 1.14 | p99    22ms | viol 0 | 430 st/s
+upd  140/146 | step  286720 | greedyR    91.5 | sampR   132.5 | SLA 1.00 | $ 1.14 | p99    25ms | viol 0 | 429 st/s
+upd  146/146 | step  299008 | greedyR    91.2 | sampR   133.9 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 429 st/s
+FINAL gat_seed2: greedy 86.8 | sampled 132.9 | SLA 1.00 | $1.03 | p99 19ms | viol 0
+
+============================================================
+RUN: encoder=gat seed=3 steps=300000
+============================================================
+upd    1/146 | step    2048 | greedyR    -6.9 | sampR   117.0 | SLA 0.90 | $ 1.12 | p99    90ms | viol 0 | 334 st/s
+upd   10/146 | step   20480 | greedyR    45.4 | sampR   124.1 | SLA 0.90 | $ 1.16 | p99    88ms | viol 0 | 429 st/s
+upd   20/146 | step   40960 | greedyR    90.7 | sampR   128.9 | SLA 1.00 | $ 1.14 | p99    22ms | viol 0 | 435 st/s
+upd   30/146 | step   61440 | greedyR    92.6 | sampR   131.9 | SLA 1.00 | $ 1.11 | p99    23ms | viol 0 | 436 st/s
+upd   40/146 | step   81920 | greedyR    92.5 | sampR   132.6 | SLA 1.00 | $ 1.11 | p99    23ms | viol 0 | 433 st/s
+upd   50/146 | step  102400 | greedyR    92.3 | sampR   132.1 | SLA 1.00 | $ 1.11 | p99    23ms | viol 0 | 432 st/s
+upd   60/146 | step  122880 | greedyR    92.9 | sampR   130.4 | SLA 1.00 | $ 1.14 | p99    22ms | viol 0 | 431 st/s
+upd   70/146 | step  143360 | greedyR    93.2 | sampR   134.9 | SLA 1.00 | $ 1.13 | p99    24ms | viol 0 | 427 st/s
+upd   80/146 | step  163840 | greedyR    93.3 | sampR   134.8 | SLA 1.00 | $ 1.11 | p99    27ms | viol 0 | 429 st/s
+upd   90/146 | step  184320 | greedyR    90.2 | sampR   130.9 | SLA 1.00 | $ 1.14 | p99    22ms | viol 0 | 429 st/s
+upd  100/146 | step  204800 | greedyR    91.4 | sampR   135.2 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 431 st/s
+upd  110/146 | step  225280 | greedyR    91.6 | sampR   136.4 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 432 st/s
+upd  120/146 | step  245760 | greedyR    91.8 | sampR   133.8 | SLA 1.00 | $ 1.14 | p99    22ms | viol 0 | 433 st/s
+upd  130/146 | step  266240 | greedyR    91.4 | sampR   137.0 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 434 st/s
+upd  140/146 | step  286720 | greedyR    91.5 | sampR   135.6 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 434 st/s
+upd  146/146 | step  299008 | greedyR    91.5 | sampR   139.7 | SLA 1.00 | $ 1.14 | p99    21ms | viol 0 | 434 st/s
+FINAL gat_seed3: greedy 87.2 | sampled 133.9 | SLA 1.00 | $1.03 | p99 20ms | viol 0
+
+============================================================
+SWEEP COMPLETE. Summary -> ../results/sweep_summary.csv
+============================================================
+gat: greedy 87.3 +/- 0.5 | sampled 132.7 +/- 1.0 (n=3 seeds)
+
+Baseline references (from baselines.py):
+  greedy_bestfit 177 | hpa 166 | round_robin 138 | random 118
