@@ -39,6 +39,11 @@ def main():
                     help="training steps per run")
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--ent-coef", type=float, default=0.01)
+    ap.add_argument("--ent-coef-final", type=float, default=None,
+                    help="anneal entropy to this (recommended for v2: 0.001)")
+    ap.add_argument("--env", default="v1", choices=["v1", "v2"],
+                    help="v1=myopic (greedy near-optimal); "
+                         "v2=sequential with migration cost")
     ap.add_argument("--outdir", default="../results")
     args = ap.parse_args()
 
@@ -48,28 +53,32 @@ def main():
     for encoder in args.encoders:
         for seed in range(1, args.seeds + 1):
             tag = f"{encoder}_seed{seed}"
+            tag = f"{args.env}_{encoder}_seed{seed}"
             log = os.path.join(args.outdir, f"amon_{tag}.csv")
             print(f"\n{'='*60}\nRUN: encoder={encoder} seed={seed} "
                   f"steps={args.steps}\n{'='*60}")
             hist, agent = train(
                 encoder=encoder, total_steps=args.steps, seed=seed,
-                lr=args.lr, ent_coef=args.ent_coef, log_path=log)
+                lr=args.lr, ent_coef=args.ent_coef,
+                ent_coef_final=args.ent_coef_final,
+                env_version=args.env, log_path=log)
 
             # Final evaluation: 20 episodes, both greedy and sampled.
-            gr, sla, cost, p99, viol = evaluate(agent, n_ep=20)
-            sr = evaluate_sampled(agent, n_ep=20)
+            gr, sla, cost, p99, viol, mig = evaluate(
+                agent, n_ep=20, env_version=args.env)
+            sr = evaluate_sampled(agent, n_ep=20, env_version=args.env)
             summary.append(dict(
-                encoder=encoder, seed=seed, steps=args.steps,
+                env=args.env, encoder=encoder, seed=seed, steps=args.steps,
                 greedy_return=gr, sampled_return=sr, sla=sla,
-                cost=cost, p99=p99, ndpr_viol=viol))
+                cost=cost, p99=p99, ndpr_viol=viol, migrations=mig))
             print(f"FINAL {tag}: greedy {gr:.1f} | sampled {sr:.1f} | "
-                  f"SLA {sla:.2f} | ${cost:.2f} | p99 {p99:.0f}ms | "
+                  f"SLA {sla:.2f} | mig {mig:.0f} | p99 {p99:.0f}ms | "
                   f"viol {viol}")
 
     # Write summary table.
-    summ_path = os.path.join(args.outdir, "sweep_summary.csv")
-    keys = ["encoder", "seed", "steps", "greedy_return", "sampled_return",
-            "sla", "cost", "p99", "ndpr_viol"]
+    summ_path = os.path.join(args.outdir, f"sweep_summary_{args.env}.csv")
+    keys = ["env", "encoder", "seed", "steps", "greedy_return",
+            "sampled_return", "sla", "cost", "p99", "ndpr_viol", "migrations"]
     with open(summ_path, "w") as f:
         f.write(",".join(keys) + "\n")
         for row in summary:
@@ -84,8 +93,15 @@ def main():
         print(f"{encoder}: greedy {np.mean(grs):.1f} +/- {np.std(grs):.1f} | "
               f"sampled {np.mean(srs):.1f} +/- {np.std(srs):.1f} "
               f"(n={len(rows)} seeds)")
-    print("\nBaseline references (from baselines.py):")
-    print("  greedy_bestfit 177 | hpa 166 | round_robin 138 | random 118")
+    if args.env == "v2":
+        print("\nv2 baselines (migration cost): "
+              "hpa 164.1 | greedy 148.3 | round_robin 142.7 | random -119.9")
+        print("  best STATIC placement (search): 178.1  <- the bar to beat")
+    else:
+        print("\nv1 baselines: greedy_bestfit 177 | hpa 166 | "
+              "round_robin 138 | random 118")
+        print("  NOTE: oracle analysis shows greedy is within ~2% of optimal "
+              "in v1;\n  there is ~3 points of headroom. See oracle.py.")
 
 
 if __name__ == "__main__":

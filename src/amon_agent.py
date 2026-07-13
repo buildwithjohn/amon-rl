@@ -49,6 +49,10 @@ _EDGE_INDEX = torch.tensor(topo.edge_index(), dtype=torch.long)
 _NODE_SCALE = torch.tensor(
     [1, 1, 1, 1, 1, 200.0, 200.0, 200.0, 1, 1, 1, 1], dtype=torch.float32)
 
+# v2 adds a 13th per-service feature ("did I just migrate?"), already O(1).
+_NODE_SCALE_V2 = torch.tensor(
+    [1, 1, 1, 1, 1, 200.0, 200.0, 200.0, 1, 1, 1, 1, 1], dtype=torch.float32)
+
 
 class GraphStateEncoder(nn.Module):
     """Reshape flat obs -> graph, normalise, GAT-encode, attach global ctx."""
@@ -62,7 +66,8 @@ class GraphStateEncoder(nn.Module):
                               out_dim=embed_dim, heads=heads)
         self.embed_dim = embed_dim
         self.register_buffer("edge_index", _EDGE_INDEX)
-        self.register_buffer("node_scale", _NODE_SCALE)
+        scale = _NODE_SCALE_V2 if node_feat == 13 else _NODE_SCALE
+        self.register_buffer("node_scale", scale)
 
     def forward(self, obs):
         """obs: (B, obs_dim) -> node_emb (B, N, D), global (B, glob_feat)."""
@@ -91,7 +96,8 @@ class FlatStateEncoder(nn.Module):
         self.node_feat = node_feat
         self.glob_feat = glob_feat
         self.embed_dim = embed_dim
-        self.register_buffer("node_scale", _NODE_SCALE)
+        scale = _NODE_SCALE_V2 if node_feat == 13 else _NODE_SCALE
+        self.register_buffer("node_scale", scale)
         self.mlp = nn.Sequential(
             layer_init(nn.Linear(node_feat, 64)), nn.Tanh(),
             layer_init(nn.Linear(64, embed_dim)), nn.Tanh(),
@@ -109,12 +115,14 @@ class FlatStateEncoder(nn.Module):
 class AmonAgent(nn.Module):
     """PPO actor-critic over MultiDiscrete placement, with NDPR masking."""
 
-    def __init__(self, encoder="gat", embed_dim=32, heads=4):
+    def __init__(self, encoder="gat", embed_dim=32, heads=4,
+                 node_feat=12, glob_feat=4):
         super().__init__()
         self.N = topo.N_SERVICES
         self.K = clouds.N_CLOUDS
         Enc = GraphStateEncoder if encoder == "gat" else FlatStateEncoder
-        self.encoder = Enc(embed_dim=embed_dim, heads=heads)
+        self.encoder = Enc(node_feat=node_feat, glob_feat=glob_feat,
+                           embed_dim=embed_dim, heads=heads)
         D = embed_dim
         G = self.encoder.glob_feat
 

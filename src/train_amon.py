@@ -21,18 +21,29 @@ import torch
 import torch.nn as nn
 
 from amon_env import AmonEnv
+from amon_env_v2 import AmonEnvV2
 from amon_agent import AmonAgent
 
 
-def evaluate(agent, n_ep=10, ep_len=200, seed0=9000, device="cpu"):
+def make_env(env_version, **kw):
+    """v1 = myopic (amon_env), v2 = sequential with migration cost."""
+    return AmonEnvV2(**kw) if env_version == "v2" else AmonEnv(**kw)
+
+
+def env_dims(env_version):
+    return (13, 5) if env_version == "v2" else (12, 4)
+
+
+def evaluate(agent, n_ep=10, ep_len=200, seed0=9000, device="cpu",
+             env_version="v1"):
     """Greedy (argmax) evaluation return + diagnostics, NDPR-masked."""
     agent.eval()
-    rets, slas, costs, p99s, viol = [], [], [], [], 0
+    rets, slas, costs, p99s, viol, migs = [], [], [], [], 0, []
     with torch.no_grad():
         for ep in range(n_ep):
-            env = AmonEnv(episode_len=ep_len, seed=seed0 + ep)
+            env = make_env(env_version, episode_len=ep_len, seed=seed0 + ep)
             obs, _ = env.reset(seed=seed0 + ep)
-            R = 0.0
+            R, M = 0.0, 0
             for t in range(ep_len):
                 obs_t = torch.tensor(obs, dtype=torch.float32,
                                      device=device).unsqueeze(0)
@@ -44,18 +55,22 @@ def evaluate(agent, n_ep=10, ep_len=200, seed0=9000, device="cpu"):
                 action = logits.argmax(dim=-1)[0].cpu().numpy()
                 obs, r, term, trunc, info = env.step(action)
                 R += r
+                M += int(info.get("migrations", 0))
                 if trunc:
                     rets.append(R); slas.append(info["sla_score"])
                     costs.append(info["cost_usd"]); p99s.append(info["p99_latency"])
+                    migs.append(M)
                     if not info["ndpr_ok"]:
                         viol += 1
                     break
     agent.train()
     return (float(np.mean(rets)), float(np.mean(slas)),
-            float(np.mean(costs)), float(np.mean(p99s)), viol)
+            float(np.mean(costs)), float(np.mean(p99s)), viol,
+            float(np.mean(migs)) if migs else 0.0)
 
 
-def evaluate_sampled(agent, n_ep=10, ep_len=200, seed0=9000, device="cpu"):
+def evaluate_sampled(agent, n_ep=10, ep_len=200, seed0=9000, device="cpu",
+                     env_version="v1"):
     """Stochastic (sampled) evaluation return, NDPR-masked. Complements the
     greedy evaluate(): when logits are near-uniform, greedy argmax is brittle,
     so the sampled return is the more faithful progress signal early on."""
@@ -63,7 +78,7 @@ def evaluate_sampled(agent, n_ep=10, ep_len=200, seed0=9000, device="cpu"):
     rets = []
     with torch.no_grad():
         for ep in range(n_ep):
-            env = AmonEnv(episode_len=ep_len, seed=seed0 + ep)
+            env = make_env(env_version, episode_len=ep_len, seed=seed0 + ep)
             obs, _ = env.reset(seed=seed0 + ep)
             R = 0.0
             for t in range(ep_len):
@@ -82,16 +97,22 @@ def evaluate_sampled(agent, n_ep=10, ep_len=200, seed0=9000, device="cpu"):
 
 def train(encoder="gat", total_steps=300_000, ep_len=200,
           rollout_len=2048, lr=3e-4, gamma=0.99, gae_lambda=0.95,
-          clip_eps=0.2, ent_coef=0.01, vf_coef=0.5, max_grad_norm=0.5,
+          clip_eps=0.2, ent_coef=0.01, ent_coef_final=None,
+          vf_coef=0.5, max_grad_norm=0.5,
           update_epochs=4, num_minibatches=8, seed=1, device="cpu",
-          eval_every=10, log_path=None):
+          eval_every=10, log_path=None, env_version="v1"):
+    """ent_coef_final: if set, the entropy coefficient is linearly annealed
+    from ent_coef to ent_coef_final over training (Fix A). A policy that must
+    hold a STABLE placement has to become deterministic; a fixed entropy bonus
+    actively prevents that, which is why the v1 agent never sharpened."""
     torch.manual_seed(seed); np.random.seed(seed)
     dev = torch.device(device)
 
-    agent = AmonAgent(encoder=encoder).to(dev)
+    nf, gf = env_dims(env_version)
+    agent = AmonAgent(encoder=encoder, node_feat=nf, glob_feat=gf).to(dev)
     optim = torch.optim.Adam(agent.parameters(), lr=lr, eps=1e-5)
 
-    env = AmonEnv(episode_len=ep_len, seed=seed)
+    env = make_env(env_version, episode_len=ep_len, seed=seed)
     obs, _ = env.reset(seed=seed)
     obs = torch.tensor(obs, dtype=torch.float32, device=dev)
     N, K, D = env.N, env.K, env.obs_dim
@@ -118,7 +139,13 @@ def train(encoder="gat", total_steps=300_000, ep_len=200,
     next_mask = cur_mask()
     for update in range(1, num_updates + 1):
         # anneal LR
-        optim.param_groups[0]["lr"] = (1.0 - (update - 1) / num_updates) * lr
+        frac = 1.0 - (update - 1) / num_updates
+        optim.param_groups[0]["lr"] = frac * lr
+        # anneal entropy coefficient (Fix A), if requested
+        if ent_coef_final is None:
+            ec = ent_coef
+        else:
+            ec = ent_coef_final + frac * (ent_coef - ent_coef_final)
 
         for step in range(rollout_len):
             global_step += 1
@@ -179,23 +206,24 @@ def train(encoder="gat", total_steps=300_000, ep_len=200,
                 v_clp = (v_clp - ret[mb]) ** 2
                 v_loss = 0.5 * torch.max(v_unc, v_clp).mean()
 
-                loss = pg_loss - ent_coef * ent.mean() + vf_coef * v_loss
+                loss = pg_loss - ec * ent.mean() + vf_coef * v_loss
                 optim.zero_grad(); loss.backward()
                 nn.utils.clip_grad_norm_(agent.parameters(), max_grad_norm)
                 optim.step()
 
         if update % eval_every == 0 or update == num_updates or update == 1:
-            er, es, ec, ep99, ev = evaluate(agent, device=device)
-            er_s = evaluate_sampled(agent, device=device)
-            history.append((global_step, er, es, ec, ep99, ev, er_s))
+            er, es, eco, ep99, ev, emig = evaluate(
+                agent, device=device, env_version=env_version)
+            er_s = evaluate_sampled(agent, device=device, env_version=env_version)
+            history.append((global_step, er, es, eco, ep99, ev, er_s, emig))
             print(f"upd {update:4d}/{num_updates} | step {global_step:7d} "
-                  f"| greedyR {er:7.1f} | sampR {er_s:7.1f} | SLA {es:.2f} | ${ec:5.2f} "
-                  f"| p99 {ep99:5.0f}ms | viol {ev} "
-                  f"| {global_step/(time.time()-t0):.0f} st/s")
+                  f"| greedyR {er:7.1f} | sampR {er_s:7.1f} | SLA {es:.2f} "
+                  f"| mig {emig:5.0f} | p99 {ep99:5.0f}ms | viol {ev} "
+                  f"| ec {ec:.4f} | {global_step/(time.time()-t0):.0f} st/s")
 
     if log_path:
         np.savetxt(log_path, np.array(history),
-                   header="step,greedy_return,sla,cost,p99,ndpr_viol,sampled_return",
+                   header="step,greedy_return,sla,cost,p99,ndpr_viol,sampled_return,migrations",
                    delimiter=",", comments="")
     return history, agent
 
@@ -207,11 +235,16 @@ if __name__ == "__main__":
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--ent-coef", type=float, default=0.01)
+    ap.add_argument("--ent-coef-final", type=float, default=None,
+                    help="anneal entropy coef to this value (Fix A)")
+    ap.add_argument("--env", default="v1", choices=["v1", "v2"],
+                    help="v1=myopic, v2=sequential with migration cost")
     ap.add_argument("--log", default=None)
     args = ap.parse_args()
     hist, agent = train(encoder=args.encoder, total_steps=args.steps,
                         seed=args.seed, lr=args.lr, ent_coef=args.ent_coef,
-                        log_path=args.log)
+                        ent_coef_final=args.ent_coef_final,
+                        env_version=args.env, log_path=args.log)
     final = hist[-1]
     print(f"\nfinal eval: R={final[1]:.1f} SLA={final[2]:.2f} "
-          f"cost=${final[3]:.2f} p99={final[4]:.0f}ms ndpr_viol={final[5]}")
+          f"migrations={final[7]:.0f} p99={final[4]:.0f}ms ndpr_viol={final[5]}")

@@ -161,3 +161,88 @@ run to completion uninterrupted.
 See RUNNING_LOCALLY.md for a step-by-step guide. Short version, from src/:
     python run_sweep.py --seeds 3 --steps 300000 --encoders gat
     # add 'flat' to --encoders for the RQ4 ablation
+
+
+## Tier-1 result on v1, and why it is not a training failure
+
+Full sweep, GAT agent, 3 seeds x 300k steps (run on local hardware):
+
+    agent (sampled): 132.7 +/- 1.0
+    agent (greedy):   87.3 +/- 0.5
+    baselines: greedy_bestfit 177 | hpa 166 | round_robin 138 | random 118
+
+The agent lands below round-robin, beating only random. Two diagnostics: (1)
+learning flatlines by ~60k steps and the remaining 240k buy nothing; (2) the
+deterministic (argmax) policy stays 45 points WORSE than the stochastic one,
+so the logits never sharpened. The agent learned a near-random spread, not a
+strategy.
+
+### The oracle analysis (src/oracle.py) — the decisive diagnostic
+Before tuning anything, we asked whether there was any headroom to win. The
+legal action space is small enough to enumerate exhaustively (3^6 * 2^4 =
+11,664 placements per step, NDPR-restricted). Evaluating every one of them at
+each state gives the ORACLE: the best any policy could possibly do.
+
+    mean oracle - greedy_bestfit : 0.016 reward/step -> ~3 return per episode
+    mean oracle - round_robin    : 0.171 reward/step -> ~34 return per episode
+    CEILING: ~180.  Greedy best-fit already scores 177.
+
+Greedy best-fit is within ~2% of the exhaustive optimum. There is NO
+meaningful headroom for a learned policy in this formulation. The agent's
+shortfall is a property of the problem, not a deficiency of the training:
+entropy annealing and reward rescaling would both have failed, and running
+them would have wasted compute proving nothing.
+
+The root cause is that the v1 placement problem is MYOPIC. The optimal action
+at each step depends only on the current traffic scale, never on history or
+the future. Under those conditions a per-step bin-packing heuristic is close
+to unbeatable and sequential decision-making has nothing to contribute.
+
+## v2: restoring sequential structure with migration cost
+
+This is a modelling artefact of v1, not a fact about cloud orchestration. In
+practice MOVING A SERVICE BETWEEN CLOUDS IS EXPENSIVE: pods reschedule, caches
+re-warm, connections drain, state transfers incur egress. v1 charged nothing
+for this, so a churning heuristic looked optimal. Measured churn in v1:
+
+    greedy best-fit : 116 migrations per episode (0.58 services moved per step)
+    hpa emulation   :   8
+    round robin     :   0 (static by construction)
+
+src/amon_env_v2.py adds a migration penalty (per-service, scaled by state
+size: redis 1.5, cartservice 1.2, currencyservice 0.2) plus a transient
+latency hit on any service in the step it moves. The reward becomes
+
+    R = alpha*SLA - beta*Cost - delta*Latency + eta*Util - mu*MigrationCost
+
+### v2 changes everything
+Baselines under migration cost (mu = 0.30):
+
+    hpa_emulation   164.1   (13 migrations)   <- now best: stable AND adaptive
+    greedy_bestfit  148.3  (125 migrations)   <- was best, now bleeds 29 points
+    round_robin     142.7    (5 migrations)
+    random         -119.9 (1203 migrations)   <- collapses entirely
+
+    best STATIC placement, found by search: 178.1  (0 migrations)
+
+No baseline is near-optimal now. Greedy packs well but churns; round-robin is
+stable but packs badly. The winning strategy -- pack well AND stay stable -- is
+exactly what no myopic heuristic can express, and there is +14 of headroom over
+the best baseline even for a purely static policy, with more available to a
+policy that migrates SELECTIVELY when a traffic shift justifies the cost.
+
+That is a genuine sequential decision problem, and it is where RL should have
+something to offer. Whether the agent actually finds such a policy is the open
+empirical question that the v2 experiments test.
+
+### Entropy annealing (Fix A), now motivated rather than guessed
+A policy that must hold a stable placement has to become deterministic. A fixed
+entropy bonus actively prevents that, which explains why the v1 agent never
+sharpened. --ent-coef-final anneals it linearly to near-zero over training.
+
+## Running the v2 experiment
+    cd src
+    python oracle.py                         # reproduce the headroom analysis
+    python amon_env_v2.py                    # v2 baselines
+    python run_sweep.py --env v2 --seeds 3 --steps 300000 \
+        --encoders gat --ent-coef 0.02 --ent-coef-final 0.001
