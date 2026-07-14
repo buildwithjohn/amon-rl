@@ -1,0 +1,11 @@
+environment,policy,return,migrations
+v1,greedy_bestfit,177,116
+v1,hpa_emulation,166,8
+v1,round_robin,138,0
+v1,random,118,-
+v1,ORACLE_CEILING,180,-
+v2,best_static_search,178.1,0
+v2,hpa_emulation,164.1,13
+v2,greedy_bestfit,148.3,125
+v2,round_robin,142.7,5
+v2,random,-119.9,1203

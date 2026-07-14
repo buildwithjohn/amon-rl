@@ -1,0 +1,4 @@
+env,encoder,seed,steps,greedy_return,sampled_return,sla,cost,p99,ndpr_viol,migrations
+v2,gat,1,1000000,87.4,118.0,0.95,1.02,23,0,19
+v2,gat,2,1000000,101.8,125.9,1.00,1.02,20,0,20
+v2,gat,3,1000000,124.5,135.0,1.00,1.03,24,0,13
