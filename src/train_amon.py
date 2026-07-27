@@ -25,9 +25,12 @@ from amon_env_v2 import AmonEnvV2
 from amon_agent import AmonAgent
 
 
-def make_env(env_version, **kw):
-    """v1 = myopic (amon_env), v2 = sequential with migration cost."""
-    return AmonEnvV2(**kw) if env_version == "v2" else AmonEnv(**kw)
+def make_env(env_version, mu=None, **kw):
+    """v1 = myopic (amon_env), v2 = sequential with migration cost.
+    mu overrides the migration weight for v2 (sensitivity analysis)."""
+    if env_version == "v2":
+        return AmonEnvV2(**kw) if mu is None else AmonEnvV2(mu=mu, **kw)
+    return AmonEnv(**kw)
 
 
 def env_dims(env_version):
@@ -35,13 +38,13 @@ def env_dims(env_version):
 
 
 def evaluate(agent, n_ep=10, ep_len=200, seed0=9000, device="cpu",
-             env_version="v1"):
+             env_version="v1", mu=None):
     """Greedy (argmax) evaluation return + diagnostics, NDPR-masked."""
     agent.eval()
     rets, slas, costs, p99s, viol, migs = [], [], [], [], 0, []
     with torch.no_grad():
         for ep in range(n_ep):
-            env = make_env(env_version, episode_len=ep_len, seed=seed0 + ep)
+            env = make_env(env_version, mu=mu, episode_len=ep_len, seed=seed0 + ep)
             obs, _ = env.reset(seed=seed0 + ep)
             R, M = 0.0, 0
             for t in range(ep_len):
@@ -70,7 +73,7 @@ def evaluate(agent, n_ep=10, ep_len=200, seed0=9000, device="cpu",
 
 
 def evaluate_sampled(agent, n_ep=10, ep_len=200, seed0=9000, device="cpu",
-                     env_version="v1"):
+                     env_version="v1", mu=None):
     """Stochastic (sampled) evaluation return, NDPR-masked. Complements the
     greedy evaluate(): when logits are near-uniform, greedy argmax is brittle,
     so the sampled return is the more faithful progress signal early on."""
@@ -78,7 +81,7 @@ def evaluate_sampled(agent, n_ep=10, ep_len=200, seed0=9000, device="cpu",
     rets = []
     with torch.no_grad():
         for ep in range(n_ep):
-            env = make_env(env_version, episode_len=ep_len, seed=seed0 + ep)
+            env = make_env(env_version, mu=mu, episode_len=ep_len, seed=seed0 + ep)
             obs, _ = env.reset(seed=seed0 + ep)
             R = 0.0
             for t in range(ep_len):

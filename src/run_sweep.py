@@ -49,6 +49,9 @@ def main():
                     help="use vectorised rollouts (8 parallel envs, ~9x faster "
                          "and far less gradient noise). Recommended.")
     ap.add_argument("--num-envs", type=int, default=8)
+    ap.add_argument("--mu", type=float, default=None,
+                    help="migration weight override for v2 (e.g. 0.10, 0.20); "
+                         "default None uses the environment default 0.30")
     ap.add_argument("--outdir", default="../results")
     args = ap.parse_args()
 
@@ -58,7 +61,8 @@ def main():
     for encoder in args.encoders:
         for seed in range(1, args.seeds + 1):
             tag = f"{encoder}_seed{seed}"
-            tag = f"{args.env}_{encoder}_seed{seed}"
+            mu_tag = f"_mu{args.mu:g}" if (args.mu is not None and args.env == "v2") else ""
+            tag = f"{args.env}{mu_tag}_{encoder}_seed{seed}"
             log = os.path.join(args.outdir, f"amon_{tag}.csv")
             print(f"\n{'='*60}\nRUN: encoder={encoder} seed={seed} "
                   f"steps={args.steps}\n{'='*60}")
@@ -67,7 +71,8 @@ def main():
                     encoder=encoder, env_version=args.env,
                     total_steps=args.steps, num_envs=args.num_envs,
                     seed=seed, lr=args.lr, ent_coef=args.ent_coef,
-                    ent_coef_final=args.ent_coef_final, log_path=log)
+                    ent_coef_final=args.ent_coef_final, log_path=log,
+                    mu=args.mu)
             else:
                 hist, agent = train(
                     encoder=encoder, total_steps=args.steps, seed=seed,
@@ -77,8 +82,9 @@ def main():
 
             # Final evaluation: 20 episodes, both greedy and sampled.
             gr, sla, cost, p99, viol, mig = evaluate(
-                agent, n_ep=20, env_version=args.env)
-            sr = evaluate_sampled(agent, n_ep=20, env_version=args.env)
+                agent, n_ep=20, env_version=args.env, mu=args.mu)
+            sr = evaluate_sampled(agent, n_ep=20, env_version=args.env,
+                                  mu=args.mu)
             summary.append(dict(
                 env=args.env, encoder=encoder, seed=seed, steps=args.steps,
                 greedy_return=gr, sampled_return=sr, sla=sla,
@@ -88,7 +94,8 @@ def main():
                   f"viol {viol}")
 
     # Write summary table.
-    summ_path = os.path.join(args.outdir, f"sweep_summary_{args.env}.csv")
+    mu_tag = f"_mu{args.mu:g}" if (args.mu is not None and args.env == "v2") else ""
+    summ_path = os.path.join(args.outdir, f"sweep_summary_{args.env}{mu_tag}.csv")
     keys = ["env", "encoder", "seed", "steps", "greedy_return",
             "sampled_return", "sla", "cost", "p99", "ndpr_viol", "migrations"]
     with open(summ_path, "w") as f:

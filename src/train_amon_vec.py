@@ -43,8 +43,10 @@ from amon_agent import AmonAgent
 from train_amon import evaluate, evaluate_sampled, env_dims
 
 
-def make_env(env_version, **kw):
-    return AmonEnvV2(**kw) if env_version == "v2" else AmonEnv(**kw)
+def make_env(env_version, mu=None, **kw):
+    if env_version == "v2":
+        return AmonEnvV2(**kw) if mu is None else AmonEnvV2(mu=mu, **kw)
+    return AmonEnv(**kw)
 
 
 def train_vec(encoder="gat", env_version="v2", total_steps=1_000_000,
@@ -52,7 +54,7 @@ def train_vec(encoder="gat", env_version="v2", total_steps=1_000_000,
               lr=3e-4, gamma=0.99, gae_lambda=0.95, clip_eps=0.2,
               ent_coef=0.02, ent_coef_final=0.001, vf_coef=0.5,
               max_grad_norm=0.5, update_epochs=4, num_minibatches=8,
-              seed=1, device="cpu", eval_every=20, log_path=None):
+              seed=1, device="cpu", eval_every=20, log_path=None, mu=None):
     """rollout_len is PER ENV: the batch per update is num_envs * rollout_len."""
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -63,7 +65,7 @@ def train_vec(encoder="gat", env_version="v2", total_steps=1_000_000,
     optim = torch.optim.Adam(agent.parameters(), lr=lr, eps=1e-5)
 
     # Parallel envs, each with its own seed so their traffic traces differ.
-    envs = [make_env(env_version, episode_len=ep_len, seed=seed * 1000 + i)
+    envs = [make_env(env_version, mu=mu, episode_len=ep_len, seed=seed * 1000 + i)
             for i in range(num_envs)]
     obs_list, mask_list = [], []
     for i, e in enumerate(envs):
@@ -175,8 +177,9 @@ def train_vec(encoder="gat", env_version="v2", total_steps=1_000_000,
 
         if update % eval_every == 0 or update in (1, num_updates):
             er, es, eco, ep99, ev, emig = evaluate(
-                agent, device=device, env_version=env_version)
-            er_s = evaluate_sampled(agent, device=device, env_version=env_version)
+                agent, device=device, env_version=env_version, mu=mu)
+            er_s = evaluate_sampled(agent, device=device, env_version=env_version,
+                                    mu=mu)
             history.append((global_step, er, es, eco, ep99, ev, er_s, emig))
             print(f"upd {update:4d}/{num_updates} | step {global_step:8d} "
                   f"| greedyR {er:7.1f} | sampR {er_s:7.1f} | SLA {es:.2f} "
@@ -203,6 +206,8 @@ if __name__ == "__main__":
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--ent-coef", type=float, default=0.02)
     ap.add_argument("--ent-coef-final", type=float, default=0.001)
+    ap.add_argument("--mu", type=float, default=None,
+                    help="migration weight override for v2 (sensitivity analysis)")
     ap.add_argument("--log", default=None)
     args = ap.parse_args()
 
@@ -210,7 +215,7 @@ if __name__ == "__main__":
         encoder=args.encoder, env_version=args.env, total_steps=args.steps,
         num_envs=args.num_envs, rollout_len=args.rollout_len, seed=args.seed,
         lr=args.lr, ent_coef=args.ent_coef, ent_coef_final=args.ent_coef_final,
-        log_path=args.log)
+        log_path=args.log, mu=args.mu)
     f = hist[-1]
     print(f"\nFINAL: greedy {f[1]:.1f} | sampled {f[6]:.1f} | SLA {f[2]:.2f} "
           f"| migrations {f[7]:.0f} | p99 {f[4]:.0f}ms | viol {f[5]}")
